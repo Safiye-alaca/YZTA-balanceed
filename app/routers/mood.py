@@ -137,3 +137,26 @@ def get_user_mood_history(user_id: int, db: Session = Depends(get_db)):
         }
         for entry in entries
     ]
+
+@router.get("/mood-history/{user_id}/chart")
+def get_mood_chart_data(user_id: int, db: Session = Depends(get_db)):
+    entries = db.query(mood_model.MoodEntry).filter(
+        mood_model.MoodEntry.user_id == user_id
+    ).order_by(mood_model.MoodEntry.timestamp.asc()).all()
+
+    if not entries:
+        raise HTTPException(status_code=404, detail="Kullanıcının ruh hali geçmişi bulunamadı.")
+
+    mood_data = [
+        {
+            "timestamp": entry.timestamp.isoformat(),
+            "score": entry.score,
+            "mood": entry.mood
+        }
+        for entry in entries
+    ]
+
+    return {
+        "user_id": user_id,
+        "mood_data": mood_data
+    }
