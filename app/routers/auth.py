@@ -41,3 +41,18 @@ def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
         "message": "Kayıt başarılı!",
         "user_id": new_user.id
     }
+
+@router.get("/teacher/{teacher_id}/students")
+def get_students_by_teacher(teacher_id: int, db: Session = Depends(get_db)):
+    students = db.query(user_model.User).filter(user_model.User.teacher_id == teacher_id).all()
+    
+    if not students:
+        raise HTTPException(status_code=404, detail="Bu öğretmene ait öğrenci bulunamadı.")
+
+    return [
+        {
+            "user_id": student.id,
+            "username": student.username
+        }
+        for student in students
+    ]
