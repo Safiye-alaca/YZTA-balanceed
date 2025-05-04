@@ -180,3 +180,27 @@ def get_user_mood_chart_data(user_id: int, db: Session = Depends(get_db)):
         "scores": scores,
         "moods": moods
     }
+
+@router.get("/history/{user_id}")
+def get_user_mood_history(
+    user_id: int,
+    current_user_id: int,  # Gerçek sistemde JWT token ile alınır
+    db: Session = Depends(get_db)
+):
+    # Erişim kontrolü
+    if user_id != current_user_id:
+        raise HTTPException(status_code=403, detail="Başka bir kullanıcının verisine erişim izniniz yok.")
+
+    entries = db.query(mood_model.MoodEntry).filter(mood_model.MoodEntry.user_id == user_id).all()
+
+    if not entries:
+        return {"message": "Henüz ruh hali kaydınız bulunmamaktadır."}
+
+    return [
+        {
+            "timestamp": entry.timestamp,
+            "score": entry.score,
+            "mood": entry.mood
+        }
+        for entry in entries
+    ]
