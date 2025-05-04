@@ -7,6 +7,8 @@ from app.models import mood as mood_model
 from collections import Counter
 from pydantic import BaseModel
 from typing import List
+from app.models import user as user_model
+
 
 router = APIRouter()
 
@@ -264,3 +266,33 @@ def get_student_history_by_teacher(
         }
         for entry in history
     ]
+
+@router.get("/teacher/{teacher_id}/class-summary")
+def get_teacher_class_mood_summary(teacher_id: int, db: Session = Depends(get_db)):
+    # Öğretmene ait öğrencileri bul
+    students = db.query(user_model.User).filter(user_model.User.teacher_id == teacher_id).all()
+    if not students:
+        raise HTTPException(status_code=404, detail="Bu öğretmene ait öğrenci bulunamadı.")
+
+    student_ids = [s.id for s in students]
+
+    # Öğrencilerin tüm mood girişlerini al
+    mood_entries = db.query(mood_model.MoodEntry).filter(mood_model.MoodEntry.user_id.in_(student_ids)).all()
+    if not mood_entries:
+        return {"message": "Henüz bu sınıfa ait ruh hali verisi girilmedi."}
+
+    # Verileri özetle
+    scores = [e.score for e in mood_entries]
+    moods = [e.mood for e in mood_entries]
+    average_score = round(sum(scores) / len(scores), 2)
+    mood_counts = dict(Counter(moods))
+    most_common_mood = max(mood_counts, key=mood_counts.get)
+
+    return {
+        "teacher_id": teacher_id,
+        "total_students": len(students),
+        "total_entries": len(mood_entries),
+        "average_score": average_score,
+        "mood_distribution": mood_counts,
+        "most_common_mood": most_common_mood
+    }
