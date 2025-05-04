@@ -296,3 +296,35 @@ def get_teacher_class_mood_summary(teacher_id: int, db: Session = Depends(get_db
         "mood_distribution": mood_counts,
         "most_common_mood": most_common_mood
     }
+
+from sqlalchemy import desc
+from app.models import user as user_model  # Eksikse bunu en üste ekle
+
+@router.get("/teacher/{teacher_id}/students-latest-moods")
+def get_students_latest_moods(teacher_id: int, db: Session = Depends(get_db)):
+    # Öğretmenin öğrencilerini bul
+    students = db.query(user_model.User).filter(user_model.User.teacher_id == teacher_id).all()
+    if not students:
+        return {"message": "Bu öğretmene ait öğrenci bulunamadı."}
+
+    result = []
+    for student in students:
+        latest_mood = (
+            db.query(mood_model.MoodEntry)
+            .filter(mood_model.MoodEntry.user_id == student.id)
+            .order_by(desc(mood_model.MoodEntry.timestamp))
+            .first()
+        )
+        if latest_mood:
+            result.append({
+                "student_id": student.id,
+                "username": student.username,
+                "mood": latest_mood.mood,
+                "score": latest_mood.score,
+                "timestamp": latest_mood.timestamp
+            })
+
+    if not result:
+        return {"message": "Öğrencilere ait ruh hali verisi bulunamadı."}
+
+    return result
