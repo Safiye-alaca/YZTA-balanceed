@@ -55,3 +55,45 @@ def generate_response(message: str) -> str:
         return "Ruh halini test etmek için test sayfasına göz at!"
     else:
         return "Üzgünüm, bu konuyu henüz anlayamıyorum. Başka bir şey dene :)"
+
+@router.get("/chatbot/{user_id}/latest-mood")
+def get_latest_user_mood(user_id: int, db: Session = Depends(get_db)):
+    latest = db.query(mood_model.MoodEntry).filter_by(user_id=user_id).order_by(
+        mood_model.MoodEntry.timestamp.desc()
+    ).first()
+
+    if not latest:
+        raise HTTPException(status_code=404, detail="Henüz ruh hali verisi yok.")
+
+    return {
+        "user_id": user_id,
+        "latest_mood": latest.mood,
+        "score": latest.score,
+        "timestamp": latest.timestamp
+    }
+
+
+@router.get("/chatbot/{user_id}/personal-recommendation")
+def chatbot_personal_recommendation(user_id: int, db: Session = Depends(get_db)):
+    last_entry = db.query(mood_model.MoodEntry).filter_by(user_id=user_id).order_by(
+        mood_model.MoodEntry.timestamp.desc()
+    ).first()
+
+    if not last_entry:
+        raise HTTPException(status_code=404, detail="Kullanıcının ruh hali kaydı bulunamadı.")
+
+    mood = last_entry.mood
+
+    suggestions = {
+        "Yorgun": "Basit grafikler ve sade içeriklerle dikkat çekmeye çalış.",
+        "Dalgın": "Görsel ağırlıklı ve dikkat çeken sunumlar tercih edilmeli.",
+        "Normal": "Sunum akıcı ve dengeli olabilir.",
+        "Meraklı": "Etkileşimli içerikler ve sorular eklemek faydalı olabilir.",
+        "Enerjik": "Yüksek tempolu ve katılım teşvik eden sunumlar tercih edilmeli."
+    }
+
+    return {
+        "user_id": user_id,
+        "mood": mood,
+        "suggested_presentation_type": suggestions.get(mood, "Genel bir içerik planı önerilebilir.")
+    }
