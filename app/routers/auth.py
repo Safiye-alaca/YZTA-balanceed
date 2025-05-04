@@ -56,3 +56,36 @@ def get_students_by_teacher(teacher_id: int, db: Session = Depends(get_db)):
         }
         for student in students
     ]
+
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+@router.post("/login")
+def login_user(user_data: UserLogin, db: Session = Depends(get_db)):
+    user = db.query(user_model.User).filter(user_model.User.username == user_data.username).first()
+
+    if not user or not bcrypt.checkpw(user_data.password.encode('utf-8'), user.password.encode('utf-8')):
+        raise HTTPException(status_code=401, detail="Geçersiz kullanıcı adı veya şifre.")
+
+    return {
+        "message": "Giriş başarılı!",
+        "user_id": user.id,
+        "username": user.username,
+        "is_teacher": user.teacher_id is None  # Eğer teacher_id yoksa bu kişi öğretmendir
+    }
+
+@router.get("/teacher/{teacher_id}/students")
+def get_students_by_teacher(teacher_id: int, db: Session = Depends(get_db)):
+    students = db.query(user_model.User).filter(user_model.User.teacher_id == teacher_id).all()
+
+    if not students:
+        raise HTTPException(status_code=404, detail="Bu öğretmene bağlı öğrenci bulunamadı.")
+
+    return [
+        {
+            "user_id": student.id,
+            "username": student.username
+        }
+        for student in students
+    ]
