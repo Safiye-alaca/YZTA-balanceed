@@ -31,9 +31,27 @@ def calculate_mood(score: int) -> str:
     else:
         return "Enerjik"
 
-# 1️⃣ Test verisi kaydetme
+from datetime import datetime, date
+from sqlalchemy import and_
+
 @router.post("/submit")
 def submit_mood_test(test_data: MoodTestInput, db: Session = Depends(get_db)):
+    today = date.today()
+
+    # Aynı gün içinde aynı kullanıcı ve sınıf için daha önce test yapılmış mı kontrol et
+    existing = db.query(mood_model.MoodEntry).filter(
+        and_(
+            mood_model.MoodEntry.user_id == test_data.user_id,
+            mood_model.MoodEntry.class_id == test_data.class_id,
+            mood_model.MoodEntry.timestamp >= datetime.combine(today, datetime.min.time()),
+            mood_model.MoodEntry.timestamp <= datetime.combine(today, datetime.max.time())
+        )
+    ).first()
+
+    if existing:
+        raise HTTPException(status_code=400, detail="Bugün bu test zaten gönderilmiş.")
+
+    # Puan hesapla ve ruh hali belirle
     score = sum(test_data.answers)
     mood = calculate_mood(score)
 
@@ -52,6 +70,7 @@ def submit_mood_test(test_data: MoodTestInput, db: Session = Depends(get_db)):
         "mood": mood,
         "message": "Ruh hali başarıyla kaydedildi!"
     }
+
 
 # 2️⃣ Sınıfa özel özet + şablon önerisi
 @router.get("/class/{class_id}/summary")
