@@ -97,3 +97,29 @@ def chatbot_personal_recommendation(user_id: int, db: Session = Depends(get_db))
         "mood": mood,
         "suggested_presentation_type": suggestions.get(mood, "Genel bir içerik planı önerilebilir.")
     }
+
+@router.get("/chatbot/{user_id}/summary")
+def chatbot_summary(user_id: int, db: Session = Depends(get_db)):
+    entries = db.query(mood_model.MoodEntry).filter(
+        mood_model.MoodEntry.user_id == user_id
+    ).order_by(mood_model.MoodEntry.timestamp.asc()).all()
+
+    if not entries:
+        raise HTTPException(status_code=404, detail="Kullanıcı için veri bulunamadı.")
+
+    total_score = sum(e.score for e in entries)
+    average_score = total_score / len(entries)
+
+    mood_counts = {}
+    for e in entries:
+        mood_counts[e.mood] = mood_counts.get(e.mood, 0) + 1
+
+    most_common_mood = max(mood_counts, key=mood_counts.get)
+
+    return {
+        "user_id": user_id,
+        "average_score": round(average_score, 2),
+        "most_common_mood": most_common_mood,
+        "total_entries": len(entries),
+        "mood_distribution": mood_counts
+    }
