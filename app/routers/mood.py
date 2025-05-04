@@ -231,3 +231,36 @@ def get_teacher_students_latest_moods(teacher_id: int, db: Session = Depends(get
             })
 
     return results
+
+@router.get("/teacher/{teacher_id}/student/{student_id}/history")
+def get_student_history_by_teacher(
+    teacher_id: int,
+    student_id: int,
+    db: Session = Depends(get_db)
+):
+    # Önce öğrencinin bu öğretmene bağlı olup olmadığını kontrol et
+    from app.models import user as user_model
+    student = db.query(user_model.User).filter(
+        user_model.User.id == student_id,
+        user_model.User.teacher_id == teacher_id
+    ).first()
+
+    if not student:
+        raise HTTPException(status_code=404, detail="Öğretmene bağlı böyle bir öğrenci bulunamadı.")
+
+    # Öğrencinin mood geçmişi
+    history = db.query(mood_model.MoodEntry).filter(
+        mood_model.MoodEntry.user_id == student_id
+    ).order_by(mood_model.MoodEntry.timestamp.desc()).all()
+
+    if not history:
+        raise HTTPException(status_code=404, detail="Bu öğrenciye ait geçmiş veri bulunamadı.")
+
+    return [
+        {
+            "timestamp": entry.timestamp,
+            "score": entry.score,
+            "mood": entry.mood
+        }
+        for entry in history
+    ]
