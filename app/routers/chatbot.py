@@ -153,3 +153,47 @@ def chatbot_personal_summary(user_id: int, db: Session = Depends(get_db)):
         "dominant_mood": dominant_mood,
         "summary_suggestion": mood_summary_recommendations.get(dominant_mood, "Kendine dikkat et ve motivasyonunu yüksek tut!")
     }
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from app.db.database import get_db
+from app.models import mood as mood_model, user as user_model
+from collections import defaultdict, Counter
+
+router = APIRouter()
+
+@router.get("/teacher/{teacher_id}/class-mood-summary")
+def get_teacher_class_mood_summary(teacher_id: int, db: Session = Depends(get_db)):
+    # Öğrencileri bul
+    students = db.query(user_model.User).filter(user_model.User.teacher_id == teacher_id).all()
+    if not students:
+        raise HTTPException(status_code=404, detail="Bu öğretmene ait öğrenci bulunamadı.")
+
+    # Öğrencilerin class_id'lerini topla
+    class_ids = list(set([student.class_id for student in students]))
+
+    result = []
+
+    for class_id in class_ids:
+        entries = db.query(mood_model.MoodEntry).filter(mood_model.MoodEntry.class_id == class_id).all()
+        if not entries:
+            continue
+
+        scores = [entry.score for entry in entries]
+        moods = [entry.mood for entry in entries]
+
+        mood_counts = dict(Counter(moods))
+        most_common_mood = max(mood_counts, key=mood_counts.get)
+        average_score = sum(scores) / len(scores)
+
+        result.append({
+            "class_id": class_id,
+            "average_score": round(average_score, 2),
+            "most_common_mood": most_common_mood,
+            "total_entries": len(entries),
+        })
+
+    return {
+        "teacher_id": teacher_id,
+        "class_summaries": result
+    }

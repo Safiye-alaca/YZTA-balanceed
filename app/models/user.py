@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, ForeignKey
 from app.db.database import Base
 
 class User(Base):
@@ -7,3 +7,4 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True)
     password = Column(String)
+    teacher_id = Column(Integer, nullable=True)  # Yeni eklenen alan

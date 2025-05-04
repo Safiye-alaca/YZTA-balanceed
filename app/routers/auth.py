@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
+from typing import Optional  # teacher_id için gerekli
 from app.db.database import get_db
 from app.models import user as user_model
 import bcrypt
@@ -13,6 +14,7 @@ router = APIRouter()
 class UserCreate(BaseModel):
     username: str
     password: str
+    teacher_id: Optional[int] = None  # Yeni eklendi
 
 # Kullanıcı kaydı
 @router.post("/register")
@@ -28,7 +30,8 @@ def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
     # Yeni kullanıcıyı oluştur
     new_user = user_model.User(
         username=user_data.username,
-        password=hashed_password.decode('utf-8')  # Veritabanına string olarak kaydet
+        password=hashed_password.decode('utf-8'),
+        teacher_id=user_data.teacher_id  # Yeni eklendi
     )
     db.add(new_user)
     db.commit()
