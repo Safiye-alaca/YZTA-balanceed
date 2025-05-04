@@ -123,3 +123,33 @@ def chatbot_summary(user_id: int, db: Session = Depends(get_db)):
         "total_entries": len(entries),
         "mood_distribution": mood_counts
     }
+
+@router.get("/chatbot/{user_id}/summary")
+def chatbot_personal_summary(user_id: int, db: Session = Depends(get_db)):
+    entries = db.query(mood_model.MoodEntry).filter(
+        mood_model.MoodEntry.user_id == user_id
+    ).order_by(mood_model.MoodEntry.timestamp.desc()).limit(10).all()
+
+    if not entries:
+        raise HTTPException(status_code=404, detail="Kullanıcının ruh hali verisi bulunamadı.")
+
+    # Ruh hali sayımlarını yap
+    mood_counts = {}
+    for entry in entries:
+        mood_counts[entry.mood] = mood_counts.get(entry.mood, 0) + 1
+
+    dominant_mood = max(mood_counts, key=mood_counts.get)
+
+    mood_summary_recommendations = {
+        "Yorgun": "Kendine zaman ayırmayı unutma. Belki kısa molalar işine yarar.",
+        "Dalgın": "Odaklanmana yardımcı olacak ortamlar yaratmaya çalış.",
+        "Normal": "Dengeli devam ediyorsun, bu tempoyu korumaya çalış.",
+        "Meraklı": "Yeni bilgiler öğrenmeye açık ol, bu enerjiyi kullan!",
+        "Enerjik": "Bu enerjiyi üretkenliğe çevirmenin tam zamanı!"
+    }
+
+    return {
+        "user_id": user_id,
+        "dominant_mood": dominant_mood,
+        "summary_suggestion": mood_summary_recommendations.get(dominant_mood, "Kendine dikkat et ve motivasyonunu yüksek tut!")
+    }
