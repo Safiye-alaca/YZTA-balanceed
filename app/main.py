@@ -21,3 +21,6 @@ app.include_router(presentation_router.router, prefix="/presentation", tags=["Pr
 def read_root():
     return {"message": "BalanceED Backend is running 🎯"}
 
+
+from app.routers import chatbot
+app.include_router(chatbot.router, prefix="/chatbot", tags=["Chatbot"])
