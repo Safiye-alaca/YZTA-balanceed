@@ -348,3 +348,36 @@ def get_students_latest_moods(teacher_id: int, db: Session = Depends(get_db)):
 
     return result
 
+@router.get("/teacher/{teacher_id}/students-mood-chart-data")
+def get_students_mood_chart_data(teacher_id: int, db: Session = Depends(get_db)):
+    from app.models import user as user_model
+
+    # Öğretmene bağlı tüm öğrencileri bul
+    students = db.query(user_model.User).filter(user_model.User.teacher_id == teacher_id).all()
+    if not students:
+        raise HTTPException(status_code=404, detail="Bu öğretmene ait öğrenci bulunamadı.")
+
+    result = []
+
+    for student in students:
+        entries = db.query(mood_model.MoodEntry).filter(
+            mood_model.MoodEntry.user_id == student.id
+        ).order_by(mood_model.MoodEntry.timestamp.asc()).all()
+
+        if not entries:
+            continue
+
+        labels = [entry.timestamp.strftime("%Y-%m-%d") for entry in entries]
+        scores = [entry.score for entry in entries]
+
+        result.append({
+            "student_id": student.id,
+            "username": student.username,
+            "labels": labels,
+            "scores": scores
+        })
+
+    if not result:
+        return {"message": "Öğrencilerin ruh hali verisi bulunamadı."}
+
+    return result
