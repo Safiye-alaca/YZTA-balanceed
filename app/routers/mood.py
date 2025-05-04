@@ -160,3 +160,23 @@ def get_mood_chart_data(user_id: int, db: Session = Depends(get_db)):
         "user_id": user_id,
         "mood_data": mood_data
     }
+
+@router.get("/user/{user_id}/chart-data")
+def get_user_mood_chart_data(user_id: int, db: Session = Depends(get_db)):
+    entries = db.query(mood_model.MoodEntry).filter(
+        mood_model.MoodEntry.user_id == user_id
+    ).order_by(mood_model.MoodEntry.timestamp).all()
+
+    if not entries:
+        raise HTTPException(status_code=404, detail="Bu kullanıcı için ruh hali geçmişi bulunamadı.")
+
+    labels = [entry.timestamp.strftime("%Y-%m-%d") for entry in entries]
+    scores = [entry.score for entry in entries]
+    moods = [entry.mood for entry in entries]
+
+    return {
+        "user_id": user_id,
+        "labels": labels,
+        "scores": scores,
+        "moods": moods
+    }
