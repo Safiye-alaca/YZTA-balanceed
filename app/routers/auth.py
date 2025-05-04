@@ -89,3 +89,17 @@ def get_students_by_teacher(teacher_id: int, db: Session = Depends(get_db)):
         }
         for student in students
     ]
+
+@router.get("/auth/user-info/{user_id}")
+def get_user_info(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(user_model.User).filter(user_model.User.id == user_id).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı.")
+
+    return {
+        "user_id": user.id,
+        "username": user.username,
+        "is_teacher": user.teacher_id is None,  # True ise öğretmen
+        "teacher_id": user.teacher_id
+    }

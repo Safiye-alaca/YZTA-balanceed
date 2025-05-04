@@ -347,3 +347,4 @@ def get_students_latest_moods(teacher_id: int, db: Session = Depends(get_db)):
         return {"message": "Öğrencilere ait ruh hali verisi bulunamadı."}
 
     return result
+
