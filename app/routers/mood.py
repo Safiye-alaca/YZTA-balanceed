@@ -119,3 +119,21 @@ def get_class_mood_summary(class_id: int, db: Session = Depends(get_db)):
         "mood_distribution": dict(mood_counts),
         "most_common_mood": common_mood
     }
+
+@router.get("/history/{user_id}")
+def get_user_mood_history(user_id: int, db: Session = Depends(get_db)):
+    entries = db.query(mood_model.MoodEntry).filter(
+        mood_model.MoodEntry.user_id == user_id
+    ).order_by(mood_model.MoodEntry.timestamp.desc()).all()
+
+    if not entries:
+        raise HTTPException(status_code=404, detail="Bu kullanıcıya ait geçmiş veri bulunamadı.")
+
+    return [
+        {
+            "timestamp": entry.timestamp.isoformat(),
+            "score": entry.score,
+            "mood": entry.mood
+        }
+        for entry in entries
+    ]
