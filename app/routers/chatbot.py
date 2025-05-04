@@ -34,3 +34,24 @@ def chatbot_suggestion(user_id: int, db: Session = Depends(get_db)):
         "mood": mood,
         "suggestion": response
     }
+
+from pydantic import BaseModel
+
+class ChatMessage(BaseModel):
+    message: str
+
+@router.post("/ask")
+def ask_chatbot(user_input: ChatMessage):
+    response = generate_response(user_input.message)
+    return {"response": response}
+
+def generate_response(message: str) -> str:
+    message = message.lower()
+    if "merhaba" in message:
+        return "Merhaba! Sana nasıl yardımcı olabilirim?"
+    elif "sunum" in message:
+        return "Sunumları görmek için sunum sayfasını kullanabilirsin."
+    elif "ruh hali" in message:
+        return "Ruh halini test etmek için test sayfasına göz at!"
+    else:
+        return "Üzgünüm, bu konuyu henüz anlayamıyorum. Başka bir şey dene :)"
