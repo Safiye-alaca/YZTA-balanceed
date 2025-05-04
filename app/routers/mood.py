@@ -204,3 +204,30 @@ def get_user_mood_history(
         }
         for entry in entries
     ]
+
+@router.get("/teacher/{teacher_id}/student-latest-moods")
+def get_teacher_students_latest_moods(teacher_id: int, db: Session = Depends(get_db)):
+    from app.models import user as user_model
+
+    # Bu öğretmene bağlı tüm öğrencileri bul
+    students = db.query(user_model.User).filter(user_model.User.teacher_id == teacher_id).all()
+
+    if not students:
+        raise HTTPException(status_code=404, detail="Bu öğretmene bağlı öğrenci bulunamadı.")
+
+    results = []
+    for student in students:
+        latest_entry = db.query(mood_model.MoodEntry).filter(
+            mood_model.MoodEntry.user_id == student.id
+        ).order_by(mood_model.MoodEntry.timestamp.desc()).first()
+
+        if latest_entry:
+            results.append({
+                "student_id": student.id,
+                "username": student.username,
+                "score": latest_entry.score,
+                "mood": latest_entry.mood,
+                "timestamp": latest_entry.timestamp
+            })
+
+    return results
