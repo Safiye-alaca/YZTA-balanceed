@@ -3,11 +3,14 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.db.database import get_db
-from app.models import mood as mood_model
+from app.models import mood as mood_model, user as user_model
+from pydantic import BaseModel
+from collections import Counter
+from typing import List
 
 router = APIRouter()
 
-# Duyguya göre öneri sözlüğü
+# 1️⃣ KİŞİSEL RUH HALİ ÖNERİSİ (Chatbot)
 MOOD_RESPONSES = {
     "Yorgun": "Bugün biraz dinlenmeyi unutma. Yarın yeni bir başlangıç olabilir!",
     "Dalgın": "Zihnini toparlamak için kısa bir yürüyüş iyi gelebilir.",
@@ -16,9 +19,8 @@ MOOD_RESPONSES = {
     "Enerjik": "Enerjini verimli kullan! Arkadaşlarınla bilgi paylaş, projelere katıl."
 }
 
-@router.get("/chatbot/{user_id}")
+@router.get("/{user_id}")
 def chatbot_suggestion(user_id: int, db: Session = Depends(get_db)):
-    # En son mood kaydını çek
     last_entry = db.query(mood_model.MoodEntry).filter_by(user_id=user_id).order_by(
         mood_model.MoodEntry.timestamp.desc()
     ).first()
@@ -35,165 +37,49 @@ def chatbot_suggestion(user_id: int, db: Session = Depends(get_db)):
         "suggestion": response
     }
 
-from pydantic import BaseModel
+# 2️⃣ YENİ: SUNUM ÖNERİ ŞABLONU (template + not + bölümler)
+class ChatbotRequest(BaseModel):
+    user_id: int
+    class_id: int
 
-class ChatMessage(BaseModel):
-    message: str
+MOOD_TEMPLATE_MAP = {
+    "Yorgun": ("calm_structure", "Daha dinlendirici, sakin bir içerik önerilir."),
+    "Dalgın": ("simple_focus", "Kısa ve dikkat çekici materyaller önerilir."),
+    "Normal": ("balanced_flow", "Dengeli ve standart bir içerik önerilir."),
+    "Meraklı": ("interactive_deep", "Etkileşimli etkinlikler ve sorular eklenebilir."),
+    "Enerjik": ("visual_dive", "Grupla çalışma, tartışma gibi aktif yöntemler önerilir.")
+}
 
-@router.post("/ask")
-def ask_chatbot(user_input: ChatMessage):
-    response = generate_response(user_input.message)
-    return {"response": response}
+TEMPLATE_SECTIONS = {
+    "calm_structure": ["Giriş", "Temel Bilgiler", "1 Görsel", "Özet"],
+    "simple_focus": ["Kısa Tanım", "Anahtar Kavramlar", "1 Soru", "Özet"],
+    "balanced_flow": ["Giriş", "Detaylar", "Örnekler", "Sonuç"],
+    "interactive_deep": ["Giriş", "Soru-Cevap", "Video Önerisi", "Derinlemesine Tartışma"],
+    "visual_dive": ["Resimlerle Tanıtım", "Kısa Açıklamalar", "Etkinlik Önerisi", "Slogan"]
+}
 
-def generate_response(message: str) -> str:
-    message = message.lower()
-    if "merhaba" in message:
-        return "Merhaba! Sana nasıl yardımcı olabilirim?"
-    elif "sunum" in message:
-        return "Sunumları görmek için sunum sayfasını kullanabilirsin."
-    elif "ruh hali" in message:
-        return "Ruh halini test etmek için test sayfasına göz at!"
-    else:
-        return "Üzgünüm, bu konuyu henüz anlayamıyorum. Başka bir şey dene :)"
+@router.post("/recommend")
+def get_chatbot_recommendation(request: ChatbotRequest, db: Session = Depends(get_db)):
+    latest_entry = db.query(mood_model.MoodEntry).filter(
+        mood_model.MoodEntry.user_id == request.user_id,
+        mood_model.MoodEntry.class_id == request.class_id
+    ).order_by(mood_model.MoodEntry.timestamp.desc()).first()
 
-@router.get("/chatbot/{user_id}/latest-mood")
-def get_latest_user_mood(user_id: int, db: Session = Depends(get_db)):
-    latest = db.query(mood_model.MoodEntry).filter_by(user_id=user_id).order_by(
-        mood_model.MoodEntry.timestamp.desc()
-    ).first()
-
-    if not latest:
-        raise HTTPException(status_code=404, detail="Henüz ruh hali verisi yok.")
-
-    return {
-        "user_id": user_id,
-        "latest_mood": latest.mood,
-        "score": latest.score,
-        "timestamp": latest.timestamp
-    }
-
-
-@router.get("/chatbot/{user_id}/personal-recommendation")
-def chatbot_personal_recommendation(user_id: int, db: Session = Depends(get_db)):
-    last_entry = db.query(mood_model.MoodEntry).filter_by(user_id=user_id).order_by(
-        mood_model.MoodEntry.timestamp.desc()
-    ).first()
-
-    if not last_entry:
-        raise HTTPException(status_code=404, detail="Kullanıcının ruh hali kaydı bulunamadı.")
-
-    mood = last_entry.mood
-
-    suggestions = {
-        "Yorgun": "Basit grafikler ve sade içeriklerle dikkat çekmeye çalış.",
-        "Dalgın": "Görsel ağırlıklı ve dikkat çeken sunumlar tercih edilmeli.",
-        "Normal": "Sunum akıcı ve dengeli olabilir.",
-        "Meraklı": "Etkileşimli içerikler ve sorular eklemek faydalı olabilir.",
-        "Enerjik": "Yüksek tempolu ve katılım teşvik eden sunumlar tercih edilmeli."
-    }
-
-    return {
-        "user_id": user_id,
-        "mood": mood,
-        "suggested_presentation_type": suggestions.get(mood, "Genel bir içerik planı önerilebilir.")
-    }
-
-@router.get("/chatbot/{user_id}/summary")
-def chatbot_summary(user_id: int, db: Session = Depends(get_db)):
-    entries = db.query(mood_model.MoodEntry).filter(
-        mood_model.MoodEntry.user_id == user_id
-    ).order_by(mood_model.MoodEntry.timestamp.asc()).all()
-
-    if not entries:
-        raise HTTPException(status_code=404, detail="Kullanıcı için veri bulunamadı.")
-
-    total_score = sum(e.score for e in entries)
-    average_score = total_score / len(entries)
-
-    mood_counts = {}
-    for e in entries:
-        mood_counts[e.mood] = mood_counts.get(e.mood, 0) + 1
-
-    most_common_mood = max(mood_counts, key=mood_counts.get)
-
-    return {
-        "user_id": user_id,
-        "average_score": round(average_score, 2),
-        "most_common_mood": most_common_mood,
-        "total_entries": len(entries),
-        "mood_distribution": mood_counts
-    }
-
-@router.get("/chatbot/{user_id}/summary")
-def chatbot_personal_summary(user_id: int, db: Session = Depends(get_db)):
-    entries = db.query(mood_model.MoodEntry).filter(
-        mood_model.MoodEntry.user_id == user_id
-    ).order_by(mood_model.MoodEntry.timestamp.desc()).limit(10).all()
-
-    if not entries:
+    if not latest_entry:
         raise HTTPException(status_code=404, detail="Kullanıcının ruh hali verisi bulunamadı.")
 
-    # Ruh hali sayımlarını yap
-    mood_counts = {}
-    for entry in entries:
-        mood_counts[entry.mood] = mood_counts.get(entry.mood, 0) + 1
+    mood = latest_entry.mood
+    if mood not in MOOD_TEMPLATE_MAP:
+        raise HTTPException(status_code=400, detail="Geçersiz ruh hali verisi.")
 
-    dominant_mood = max(mood_counts, key=mood_counts.get)
-
-    mood_summary_recommendations = {
-        "Yorgun": "Kendine zaman ayırmayı unutma. Belki kısa molalar işine yarar.",
-        "Dalgın": "Odaklanmana yardımcı olacak ortamlar yaratmaya çalış.",
-        "Normal": "Dengeli devam ediyorsun, bu tempoyu korumaya çalış.",
-        "Meraklı": "Yeni bilgiler öğrenmeye açık ol, bu enerjiyi kullan!",
-        "Enerjik": "Bu enerjiyi üretkenliğe çevirmenin tam zamanı!"
-    }
+    template_key, note = MOOD_TEMPLATE_MAP[mood]
 
     return {
-        "user_id": user_id,
-        "dominant_mood": dominant_mood,
-        "summary_suggestion": mood_summary_recommendations.get(dominant_mood, "Kendine dikkat et ve motivasyonunu yüksek tut!")
-    }
-
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from app.db.database import get_db
-from app.models import mood as mood_model, user as user_model
-from collections import defaultdict, Counter
-
-router = APIRouter()
-
-@router.get("/teacher/{teacher_id}/class-mood-summary")
-def get_teacher_class_mood_summary(teacher_id: int, db: Session = Depends(get_db)):
-    # Öğrencileri bul
-    students = db.query(user_model.User).filter(user_model.User.teacher_id == teacher_id).all()
-    if not students:
-        raise HTTPException(status_code=404, detail="Bu öğretmene ait öğrenci bulunamadı.")
-
-    # Öğrencilerin class_id'lerini topla
-    class_ids = list(set([student.class_id for student in students]))
-
-    result = []
-
-    for class_id in class_ids:
-        entries = db.query(mood_model.MoodEntry).filter(mood_model.MoodEntry.class_id == class_id).all()
-        if not entries:
-            continue
-
-        scores = [entry.score for entry in entries]
-        moods = [entry.mood for entry in entries]
-
-        mood_counts = dict(Counter(moods))
-        most_common_mood = max(mood_counts, key=mood_counts.get)
-        average_score = sum(scores) / len(scores)
-
-        result.append({
-            "class_id": class_id,
-            "average_score": round(average_score, 2),
-            "most_common_mood": most_common_mood,
-            "total_entries": len(entries),
-        })
-
-    return {
-        "teacher_id": teacher_id,
-        "class_summaries": result
+        "user_id": request.user_id,
+        "mood": mood,
+        "recommendation": {
+            "template": template_key,
+            "sections": TEMPLATE_SECTIONS[template_key],
+            "note": note
+        }
     }
