@@ -127,3 +127,35 @@ def get_presentations_for_student(class_id: int, db: Session = Depends(get_db)):
             "uploaded_at": p.upload_timestamp
         } for p in presentations
     ]
+
+@router.get("/student/{student_id}/presentation/{presentation_id}/detail")
+def get_presentation_detail_for_student(student_id: int, presentation_id: int, db: Session = Depends(get_db)):
+    from app.models import user as user_model
+    from app.models import presentation as presentation_model
+
+    # Öğrenciyi kontrol et
+    student = db.query(user_model.User).filter(user_model.User.id == student_id).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Öğrenci bulunamadı.")
+
+    # Sunumu kontrol et: öğrenci ile aynı sınıfa ait mi
+    presentation = db.query(presentation_model.Presentation).filter(
+        presentation_model.Presentation.id == presentation_id,
+        presentation_model.Presentation.class_id == student.class_id
+    ).first()
+
+    if not presentation:
+        raise HTTPException(status_code=404, detail="Bu sunum bu öğrenciye ait sınıfla eşleşmiyor.")
+
+    # Sunumu yükleyen öğretmeni al
+    teacher = db.query(user_model.User).filter(user_model.User.id == presentation.teacher_id).first()
+    teacher_name = teacher.username if teacher else "Bilinmiyor"
+
+    return {
+        "presentation_id": presentation.id,
+        "title": presentation.title,
+        "description": presentation.description,
+        "uploaded_at": presentation.upload_timestamp,
+        "teacher_name": teacher_name,
+        "download_link": f"/files/{presentation.file_path}"
+    }
