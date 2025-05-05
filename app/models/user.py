@@ -8,4 +8,4 @@ class User(Base):
     username = Column(String, unique=True, index=True)
     password = Column(String)
     teacher_id = Column(Integer, nullable=True)  # Yeni eklenen alan
-    class_id = Column(Integer,nullable=True)
+    class_id = Column(Integer, nullable=True)  # Öğrencinin ait olduğu sınıfı belirtir
