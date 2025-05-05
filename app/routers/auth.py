@@ -103,3 +103,42 @@ def get_user_info(user_id: int, db: Session = Depends(get_db)):
         "is_teacher": user.teacher_id is None,  # True ise öğretmen
         "teacher_id": user.teacher_id
     }
+
+
+class PasswordUpdateRequest(BaseModel):
+    new_password: str
+
+@router.put("/user/{user_id}/update-password")
+def update_user_password(
+    user_id: int,
+    password_data: PasswordUpdateRequest,
+    db: Session = Depends(get_db)
+):
+    user = db.query(user_model.User).filter(user_model.User.id == user_id).first()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı.")
+
+
+    hashed_password = bcrypt.hashpw(password_data.new_password.encode('utf-8'), bcrypt.gensalt())
+    user.password = hashed_password.decode('utf-8')
+
+    db.commit()
+    db.refresh(user)
+
+    return {"message": "Şifre başarıyla güncellendi."}
+
+@router.get("/class/{class_id}/students")
+def get_students_by_class(class_id: int, db: Session = Depends(get_db)):
+    students = db.query(user_model.User).filter(user_model.User.class_id == class_id).all()
+
+    if not students:
+        raise HTTPException(status_code=404, detail="Bu sınıfa ait öğrenci bulunamadı.")
+
+    return [
+        {
+            "user_id": student.id,
+            "username": student.username
+        }
+        for student in students
+    ]
