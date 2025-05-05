@@ -111,3 +111,19 @@ def get_presentations_for_student(class_id: int, db: Session = Depends(get_db)):
             "uploaded_at": p.upload_timestamp
         } for p in presentations
     ]
+
+@router.get("/student/{class_id}/presentations")
+def get_presentations_for_student(class_id: int, db: Session = Depends(get_db)):
+    from app.models import presentation as presentation_model
+
+    presentations = db.query(presentation_model.Presentation).filter(
+        presentation_model.Presentation.class_id == class_id
+    ).all()
+
+    return [
+        {
+            "title": p.title,
+            "download_link": f"/files/{p.file_path}",
+            "uploaded_at": p.upload_timestamp
+        } for p in presentations
+    ]
